@@ -16,7 +16,7 @@ YELLOW = (255, 255, 0)  # BFS Path
 CYAN = (0, 255, 255)  # Dijkstra Path
 MAGENTA = (255, 0, 255)  # Final Path
 ORANGE = (255, 165, 0)  # Current Point
-PURPLE = (128, 0, 128)  # Backtracked Points
+PURPLE = (128, 0, 128)  # Dead End Fill
 
 # Directions and their movements
 N, S, E, W = 1, 2, 4, 8
@@ -44,8 +44,12 @@ pygame.display.set_caption("Maze Auto Solver")
 font = pygame.font.SysFont(None, 20)
 clock = pygame.time.Clock()
 
+# Ask the user if they want to watch the process
+watch_process = input("Do you want to watch the solving process? (yes/no) [default: yes]: ").lower() != "no"
+delay_time = 0.05 if watch_process else 0
+
 # Draw the maze
-def draw_maze(path=None, color=BLUE, algorithm_name="", final_path=None, current=None, backtracked=None, visited=None):
+def draw_maze(path=None, color=BLUE, algorithm_name="", final_path=None, current=None, visited=None):
     screen.fill(WHITE)
     pygame.draw.rect(screen, DARK_GREY, (0, 0, width * CELL_SIZE, TOP_BAR_HEIGHT))
     algorithm_text = font.render(f"Algorithm: {algorithm_name}", True, BLACK)
@@ -53,7 +57,6 @@ def draw_maze(path=None, color=BLUE, algorithm_name="", final_path=None, current
 
     for y in range(height):
         for x in range(width):
-            # Draw start and end cells
             if y == 0 and x == 0:
                 pygame.draw.rect(screen, RED, (x * CELL_SIZE, y * CELL_SIZE + TOP_BAR_HEIGHT, CELL_SIZE, CELL_SIZE))
             elif y == height - 1 and x == width - 1:
@@ -62,16 +65,11 @@ def draw_maze(path=None, color=BLUE, algorithm_name="", final_path=None, current
                 pygame.draw.rect(screen, MAGENTA, (x * CELL_SIZE, y * CELL_SIZE + TOP_BAR_HEIGHT, CELL_SIZE, CELL_SIZE))
             elif visited and (x, y) in visited:
                 pygame.draw.rect(screen, CYAN, (x * CELL_SIZE, y * CELL_SIZE + TOP_BAR_HEIGHT, CELL_SIZE, CELL_SIZE))
-            elif current == (x, y):
-                pygame.draw.rect(screen, ORANGE, (x * CELL_SIZE, y * CELL_SIZE + TOP_BAR_HEIGHT, CELL_SIZE, CELL_SIZE))
-            elif backtracked and (x, y) in backtracked:
-                pygame.draw.rect(screen, PURPLE, (x * CELL_SIZE, y * CELL_SIZE + TOP_BAR_HEIGHT, CELL_SIZE, CELL_SIZE))
             elif path and (x, y) in path:
                 pygame.draw.rect(screen, color, (x * CELL_SIZE, y * CELL_SIZE + TOP_BAR_HEIGHT, CELL_SIZE, CELL_SIZE))
             else:
                 pygame.draw.rect(screen, WHITE, (x * CELL_SIZE, y * CELL_SIZE + TOP_BAR_HEIGHT, CELL_SIZE, CELL_SIZE))
-            
-            # Draw walls
+
             if grid[y][x] & N == 0:
                 pygame.draw.line(screen, BLACK, (x * CELL_SIZE, y * CELL_SIZE + TOP_BAR_HEIGHT), ((x + 1) * CELL_SIZE, y * CELL_SIZE + TOP_BAR_HEIGHT), 2)
             if grid[y][x] & S == 0:
@@ -82,9 +80,6 @@ def draw_maze(path=None, color=BLUE, algorithm_name="", final_path=None, current
                 pygame.draw.line(screen, BLACK, ((x + 1) * CELL_SIZE, y * CELL_SIZE + TOP_BAR_HEIGHT), ((x + 1) * CELL_SIZE, (y + 1) * CELL_SIZE + TOP_BAR_HEIGHT), 2)
 
     pygame.display.flip()
-    pygame.image.save(screen, f"{algorithm_name}_overlay_solve.png")
-    pygame.event.pump()
-
 # DFS Algorithm
 def dfs_solve():
     stack = [(0, 0)]
@@ -106,7 +101,7 @@ def dfs_solve():
             continue
         visited.add((x, y))
         draw_maze(path=list(visited), color=BLUE, algorithm_name="Depth-First Search", current=(x, y), visited=visited)
-        time.sleep(0.01)
+        time.sleep(delay_time)
 
         if (x, y) == (width - 1, height - 1):  # Reached the goal
             path = []
@@ -168,7 +163,7 @@ def bfs_solve():
                     queue.append((nx, ny))
                     draw_maze(list(visited), YELLOW, "Breadth-First Search", current=(nx, ny))
                     pygame.display.update()
-                    time.sleep(0.05)
+                    time.sleep(delay_time)
     return [], moves
 
 # Dijkstra's Algorithm
@@ -214,81 +209,43 @@ def dijkstra_solve():
                     heapq.heappush(pq, (new_distance, (nx, ny)))
                     draw_maze(list(visited), CYAN, "Dijkstra's Algorithm", current=(nx, ny))
                     pygame.display.update()
-                    time.sleep(0.05)
+                    time.sleep(delay_time)
     return [], moves
+# Dead-End Fill Algorithm
+def dead_end_fill():
+    filled = set()
+    changes = True
 
-# Left-Wall Following Algorithm
-def left_wall_follow():
-    x, y = 0, 0
-    visited = []
-    direction = E  # Start facing East
-    moves = 0
+    while changes:
+        changes = False
+        for y in range(height):
+            for x in range(width):
+                if (x, y) in filled or (x, y) == (0, 0) or (x, y) == (width - 1, height - 1):
+                    continue
 
-    while (x, y) != (width - 1, height - 1):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                return None, float('inf')
+                open_neighbors = 0
+                last_neighbor = None
+                for direction in [N, S, E, W]:
+                    if grid[y][x] & direction != 0:
+                        nx, ny = x + DX[direction], y + DY[direction]
+                        if (nx, ny) not in filled:
+                            open_neighbors += 1
+                            last_neighbor = (nx, ny)
 
-        visited.append((x, y))
-        draw_maze(path=visited, color=CYAN, algorithm_name="Left-Wall Follow", current=(x, y))
-        time.sleep(0.05)
+                if open_neighbors == 1:  # Dead-end
+                    filled.add((x, y))
+                    grid[y][x] &= ~sum(DX.keys())  # Remove all connections
+                    changes = True
 
-        # Check the wall to the left of the current direction
-        left_direction = {E: N, N: W, W: S, S: E}[direction]
-        if grid[y][x] & left_direction != 0:  # Can move left
-            direction = left_direction
-        elif grid[y][x] & direction == 0:  # Can't move forward
-            direction = {E: S, S: W, W: N, N: E}[direction]  # Turn right
-        # Move forward
-        x, y = x + DX[direction], y + DY[direction]
-        moves += 1
+        draw_maze(path=filled, color=PURPLE, algorithm_name="Dead-End Fill", visited=filled)
+        time.sleep(delay_time)
 
-    visited.append((x, y))  # Add the last cell
-    draw_maze(path=visited, color=MAGENTA, algorithm_name="Left-Wall Follow", final_path=visited)
-    pygame.image.save(screen, "LeftWallFollow_solve.png")
-    return visited, moves
-
-# Right-Wall Following Algorithm
-def right_wall_follow():
-    x, y = 0, 0
-    visited = []
-    direction = E  # Start facing East
-    moves = 0
-
-    while (x, y) != (width - 1, height - 1):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                return None, float('inf')
-
-        visited.append((x, y))
-        draw_maze(path=visited, color=CYAN, algorithm_name="Right-Wall Follow", current=(x, y))
-        time.sleep(0.05)
-
-        # Check the wall to the right of the current direction
-        right_direction = {E: S, S: W, W: N, N: E}[direction]
-        if grid[y][x] & right_direction != 0:  # Can move right
-            direction = right_direction
-        elif grid[y][x] & direction == 0:  # Can't move forward
-            direction = {E: N, N: W, W: S, S: E}[direction]  # Turn left
-        # Move forward
-        x, y = x + DX[direction], y + DY[direction]
-        moves += 1
-
-    visited.append((x, y))  # Add the last cell
-    draw_maze(path=visited, color=MAGENTA, algorithm_name="Right-Wall Follow", final_path=visited)
-    pygame.image.save(screen, "RightWallFollow_solve.png")
-    return visited, moves
+    draw_maze(final_path=filled, color=MAGENTA, algorithm_name="Dead-End Fill")
+    pygame.image.save(screen, "DeadEndFill_solve.png")
 
 # Run the algorithms and generate a report
 def run_solvers():
     results = []
-
     # Run DFS
     start_time = time.time()
     dfs_path, dfs_moves = dfs_solve()
@@ -322,27 +279,12 @@ def run_solvers():
 
     time.sleep(1)
 
-    # Run Left-Wall Follow
+    # Run Dead-End Fill
     start_time = time.time()
-    lwf_path, lwf_moves = left_wall_follow()
-    lwf_time = time.time() - start_time
-    if lwf_path is None:
-        results.append(("Left-Wall Follow", "DNF", float('inf'), float('inf')))
-    else:
-        results.append(("Left-Wall Follow", len(lwf_path), lwf_time, lwf_moves))
+    dead_end_fill()
+    dead_end_fill_time = time.time() - start_time
+    results.append(("Dead-End Fill", "N/A", dead_end_fill_time, "N/A"))
 
-    time.sleep(1)
-
-    # Run Right-Wall Follow
-    start_time = time.time()
-    rwf_path, rwf_moves = right_wall_follow()
-    rwf_time = time.time() - start_time
-    if rwf_path is None:
-        results.append(("Right-Wall Follow", "DNF", float('inf'), float('inf')))
-    else:
-        results.append(("Right-Wall Follow", len(rwf_path), rwf_time, rwf_moves))
-
-    # Print report
     print("\nMaze Solving Report:")
     for name, length, duration, moves in results:
         print(f"{name}: Path Length = {length}, Time Taken = {duration:.2f} seconds, Moves Considered = {moves}")
