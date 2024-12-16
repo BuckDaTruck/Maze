@@ -1,0 +1,5 @@
+10x10 Maze Solving Report:
+Depth-First Search: Path Length = 27, Time Taken = 0.10 seconds, Moves Considered = 46
+Breadth-First Search: Path Length = 27, Time Taken = 0.22 seconds, Moves Considered = 81
+Dijkstra's Algorithm: Path Length = 27, Time Taken = 0.21 seconds, Moves Considered = 82
+Dead-End Fill: Path Length = 27, Time Taken = 0.21 seconds, Moves Considered = 73

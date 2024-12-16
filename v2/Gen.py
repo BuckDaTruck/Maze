@@ -98,7 +98,7 @@ x, y = random.randint(0, width - 1), random.randint(0, height - 1)
 while True:
     draw_maze()
     pygame.event.pump()
-    time.sleep(0.001)
+    time.sleep(0.0001)
 
     result = walk(x, y)
     if result:

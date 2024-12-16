@@ -1,0 +1,5 @@
+50x50 Maze Solving Report:
+Depth-First Search: Path Length = 303, Time Taken = 8.18 seconds, Moves Considered = 628
+Breadth-First Search: Path Length = 303, Time Taken = 36.66 seconds, Moves Considered = 2114
+Dijkstra's Algorithm: Path Length = 303, Time Taken = 38.94 seconds, Moves Considered = 2115
+Dead-End Fill: Path Length = 303, Time Taken = 13.03 seconds, Moves Considered = 2197

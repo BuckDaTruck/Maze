@@ -11,12 +11,12 @@ GREEN = (0, 255, 0)  # End
 DARK_GREY = (64, 64, 64)  # Top bar
 BLACK = (0, 0, 0)  # Wall
 WHITE = (255, 255, 255)  # Background
-BLUE = (0, 0, 255)  # DFS Path
+BLUE = (0, 0, 255)  # Dead-End Fill Blocks
 YELLOW = (255, 255, 0)  # BFS Path
 CYAN = (0, 255, 255)  # Dijkstra Path
 MAGENTA = (255, 0, 255)  # Final Path
 ORANGE = (255, 165, 0)  # Current Point
-PURPLE = (128, 0, 128)  # Dead End Fill
+PURPLE = (128, 0, 128)  # DFS Path
 
 # Directions and their movements
 N, S, E, W = 1, 2, 4, 8
@@ -78,6 +78,10 @@ def draw_maze(path=None, color=BLUE, algorithm_name="", final_path=None, current
                 pygame.draw.line(screen, BLACK, (x * CELL_SIZE, y * CELL_SIZE + TOP_BAR_HEIGHT), (x * CELL_SIZE, (y + 1) * CELL_SIZE + TOP_BAR_HEIGHT), 2)
             if grid[y][x] & E == 0:
                 pygame.draw.line(screen, BLACK, ((x + 1) * CELL_SIZE, y * CELL_SIZE + TOP_BAR_HEIGHT), ((x + 1) * CELL_SIZE, (y + 1) * CELL_SIZE + TOP_BAR_HEIGHT), 2)
+
+    if current:
+        cx, cy = current
+        pygame.draw.rect(screen, ORANGE, (cx * CELL_SIZE, cy * CELL_SIZE + TOP_BAR_HEIGHT, CELL_SIZE, CELL_SIZE))
 
     pygame.display.flip()
 # DFS Algorithm
@@ -142,6 +146,8 @@ def bfs_solve():
         x, y = queue.popleft()
         moves += 1
         draw_maze(list(visited), YELLOW, "Breadth-First Search", current=(x, y), visited=visited)
+        time.sleep(delay_time)
+
         if (x, y) == (width - 1, height - 1):
             path = []
             while (x, y) is not None:
@@ -161,9 +167,7 @@ def bfs_solve():
                     visited.add((nx, ny))
                     parent[(nx, ny)] = (x, y)
                     queue.append((nx, ny))
-                    draw_maze(list(visited), YELLOW, "Breadth-First Search", current=(nx, ny))
-                    pygame.display.update()
-                    time.sleep(delay_time)
+
     return [], moves
 
 # Dijkstra's Algorithm
@@ -184,6 +188,8 @@ def dijkstra_solve():
         current_distance, (x, y) = heapq.heappop(pq)
         moves += 1
         draw_maze(list(visited), CYAN, "Dijkstra's Algorithm", current=(x, y), visited=visited)
+        time.sleep(delay_time)
+
         if (x, y) in visited:
             continue
         visited.add((x, y))
@@ -207,13 +213,15 @@ def dijkstra_solve():
                     distances[(nx, ny)] = new_distance
                     parent[(nx, ny)] = (x, y)
                     heapq.heappush(pq, (new_distance, (nx, ny)))
-                    draw_maze(list(visited), CYAN, "Dijkstra's Algorithm", current=(nx, ny))
-                    pygame.display.update()
-                    time.sleep(delay_time)
+
     return [], moves
+
 # Dead-End Fill Algorithm
 def dead_end_fill():
     filled = set()
+    path = set()
+    path_length = 0
+    moves = 0
     changes = True
 
     while changes:
@@ -236,17 +244,25 @@ def dead_end_fill():
                     filled.add((x, y))
                     grid[y][x] &= ~sum(DX.keys())  # Remove all connections
                     changes = True
+                    moves += 1
+                    draw_maze(path=filled, color=BLUE, algorithm_name="Dead-End Fill", visited=path, current=(x, y))
+                    time.sleep(delay_time)
 
-        draw_maze(path=filled, color=PURPLE, algorithm_name="Dead-End Fill", visited=filled)
-        time.sleep(delay_time)
+    # Trace back the remaining path
+    for y in range(height):
+        for x in range(width):
+            if (x, y) not in filled:
+                path.add((x, y))
 
-    draw_maze(final_path=filled, color=MAGENTA, algorithm_name="Dead-End Fill")
+    path_length = len(path)
+    draw_maze(final_path=path, color=MAGENTA, algorithm_name="Dead-End Fill")
     pygame.image.save(screen, "DeadEndFill_solve.png")
+    return path_length, moves
 
 # Run the algorithms and generate a report
 def run_solvers():
     results = []
-    # Run DFS
+     # Run DFS
     start_time = time.time()
     dfs_path, dfs_moves = dfs_solve()
     dfs_time = time.time() - start_time
@@ -278,12 +294,11 @@ def run_solvers():
         results.append(("Dijkstra's Algorithm", len(dijkstra_path), dijkstra_time, dijkstra_moves))
 
     time.sleep(1)
-
     # Run Dead-End Fill
     start_time = time.time()
-    dead_end_fill()
+    dead_end_path_length, dead_end_moves = dead_end_fill()
     dead_end_fill_time = time.time() - start_time
-    results.append(("Dead-End Fill", "N/A", dead_end_fill_time, "N/A"))
+    results.append(("Dead-End Fill", dead_end_path_length, dead_end_fill_time, dead_end_moves))
 
     print("\nMaze Solving Report:")
     for name, length, duration, moves in results:
